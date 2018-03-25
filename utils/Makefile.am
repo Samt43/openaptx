@@ -2,7 +2,7 @@
 # Copyright (c) 2017 Arkadiusz Bokowy
 
 AM_CFLAGS = -I$(top_srcdir)/include
-LDADD = -L$(top_builddir)/src/.libs -lbt-aptx
+LDADD = -L$(top_builddir)/src/.libs -lbt-aptx -lm
 
 bin_PROGRAMS = \
 	aptx-encode \
