@@ -35,7 +35,7 @@ static void encode(AVCodecContext *ctx, AVFrame *frame, AVPacket *pkt,
     ret = avcodec_send_frame(ctx, frame);
     if (ret < 0) {
         fprintf(stderr, "error sending the frame to the encoder\n");
-        exit(1);
+        return ret;
     }
     /* read all the available output packets (in general there may be any
      * number of them */
@@ -45,10 +45,10 @@ static void encode(AVCodecContext *ctx, AVFrame *frame, AVPacket *pkt,
             return;
         else if (ret < 0) {
             fprintf(stderr, "error encoding audio frame\n");
-            exit(1);
+            return ret;
         }
 
-        memcopy(code, pkt->data, pkt->size);
+        memcpy(code, pkt->data, pkt->size);
         av_packet_unref(pkt);
     }
 }
@@ -79,31 +79,29 @@ int aptxbtenc_init(APTXENC enc, bool swap) {
     e->c->bit_rate = 48000;
     /* check that the encoder supports s16 pcm input */
     e->c->sample_fmt = AV_SAMPLE_FMT_S32P;
-    if (!check_sample_fmt(e->avCodec, e->c->sample_fmt)) {
-        fprintf(stderr, "encoder does not support %s",
-                av_get_sample_fmt_name(e->c->sample_fmt));
-        exit(1);
-    }
+    e->c->sample_rate = 48000;
+    
     /* select other audio parameters supported by the encoder */
     e->c->frame_size    = 4;
+    e->c->time_base     = (AVRational){ 1, 48000 };
     e->c->channel_layout = AV_CH_LAYOUT_STEREO;
     e->c->channels       = av_get_channel_layout_nb_channels(e->c->channel_layout);
     /* open it */
     if (avcodec_open2(e->c, e->avCodec, NULL) < 0) {
         fprintf(stderr, "could not open codec\n");
-        exit(1);
+        return ret;
     }
     /* packet for holding encoded output */
     e->pkt = av_packet_alloc();
     if (!e->pkt) {
         fprintf(stderr, "could not allocate the packet\n");
-        exit(1);
+        return ret;
     }
     /* frame containing input raw audio */
     e->frame = av_frame_alloc();
     if (!e->frame) {
         fprintf(stderr, "could not allocate audio frame\n");
-        exit(1);
+        return ret;
     }
     e->frame->nb_samples     = e->c->frame_size;
     e->frame->format         = e->c->sample_fmt;
@@ -112,7 +110,7 @@ int aptxbtenc_init(APTXENC enc, bool swap) {
     ret = av_frame_get_buffer(e->frame, 0);
     if (ret < 0) {
         fprintf(stderr, "could not allocate audio data buffers\n");
-        exit(1);
+        return ret;
     }
 
     return ret;
@@ -133,7 +131,7 @@ int aptxbtenc_encodestereo(
         * kept a reference internally */
     ret = av_frame_make_writable(e->frame);
     if (ret < 0)
-        exit(1);
+        return ret;
     uint16_t* samples = (uint16_t*)e->frame->data[0];
 
     for (int j = 0; j < e->c->frame_size; j++) {
