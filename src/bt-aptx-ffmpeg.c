@@ -27,30 +27,30 @@ static struct aptxbtenc_encoder {
 } encoder;
 
 
-static void encode(AVCodecContext *ctx, AVFrame *frame, AVPacket *pkt,
+static int encode(AVCodecContext *ctx, AVFrame *frame, AVPacket *pkt,
                    uint16_t code[2])
 {
-    int ret;
+    int ret = 0;
     /* send the frame for encoding */
     ret = avcodec_send_frame(ctx, frame);
     if (ret < 0) {
         fprintf(stderr, "error sending the frame to the encoder\n");
         return ret;
     }
-    /* read all the available output packets (in general there may be any
-     * number of them */
-    while (ret >= 0) {
-        ret = avcodec_receive_packet(ctx, pkt);
-        if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF)
-            return;
-        else if (ret < 0) {
-            fprintf(stderr, "error encoding audio frame\n");
-            return ret;
-        }
 
-        memcpy(code, pkt->data, pkt->size);
-        av_packet_unref(pkt);
+    /* It seems there is always one packet here */
+    ret = avcodec_receive_packet(ctx, pkt);
+    if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF)
+        return ret;
+    else if (ret < 0) {
+        fprintf(stderr, "error encoding audio frame\n");
+        return ret;
     }
+
+    memcpy(code, pkt->data, pkt->size);
+    av_packet_unref(pkt);
+
+    return ret;
 }
 
 int aptxbtenc_init(APTXENC enc, bool swap) {
@@ -132,20 +132,24 @@ int aptxbtenc_encodestereo(
     ret = av_frame_make_writable(e->frame);
     if (ret < 0)
         return ret;
-    uint16_t* samples = (uint16_t*)e->frame->data[0];
+    int32_t* samplesLeft = (int32_t*)e->frame->data[0];
 
     for (int j = 0; j < e->c->frame_size; j++) {
-        samples[2*j] = pcmL[j];
-        for (int k = 1; k < e->c->channels; k++)
-            samples[2*j + k] = pcmR[j];
+        samplesLeft[j] = pcmL[j] << 16;
     }
-    encode(e->c, e->frame, e->pkt, code);
+    
+    int32_t* samplesRight = (int32_t*)e->frame->data[1];
 
-	return ret;
+    for (int j = 0; j < e->c->frame_size; j++) {
+        samplesRight[j] = pcmR[j] << 16;
+    }
+
+    ret = encode(e->c, e->frame, e->pkt, code);
+    return ret;
 }
 
 const char *aptxbtenc_build(void) {
-	return "stub-1.0";
+	return "AptxFFMpeg-1.0";
 }
 
 const char *aptxbtenc_version(void) {

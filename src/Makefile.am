@@ -9,12 +9,11 @@ lib_LTLIBRARIES = \
 
 libbt_aptx_la_SOURCES = \
 	bt-aptx-stub-sonar.c \
-	bt-aptx-stub.c
+	bt-aptx-ffmpeg.c
 
 libbt_aptx_la_LDFLAGS = -no-undefined --whole-archive\
 $(top_builddir)/libavcodec/libavcodec.a\
-$(top_builddir)/libavutil/libavutil.a\
-$(top_builddir)/libavformat/libavformat.a
+$(top_builddir)/libavutil/libavutil.a
 	
 bt-aptx-stub-sonar.c: $(srcdir)/sonar.aptx
 	echo " \
